@@ -1,0 +1,16 @@
+Resources:
+  ReportingCron:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Properties:
+      TableName: ${self:custom.tableName}
+      AttributeDefinitions:
+        - AttributeName: cronId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cronId
+          KeyType: HASH
+      # Set the capacity to auto-scale
+      ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1

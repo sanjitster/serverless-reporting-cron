@@ -1,0 +1,7 @@
+Resources:
+  ReportingSQSQueue:
+    Type: "AWS::SQS::Queue"
+    Properties:
+      QueueName: reporting-queue-${opt:stage, self:provider.stage}.fifo
+      FifoQueue: true
+      ContentBasedDeduplication: true

@@ -1,0 +1,162 @@
+app: reporting-cron
+service: reporting-cron-apis
+
+plugins:
+  - serverless-webpack
+  - serverless-pseudo-parameters
+  - serverless-plugin-warmup
+  - serverless-plugin-existing-s3
+
+custom:
+  env: ${file(env.json)}
+  tableName: ${self:custom.env.NODE_ENV}-ReportingCron
+
+package:
+  include:
+    - templates/**
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  profile: ${self:custom.env.NODE_ENV}
+  region: ap-southeast-1
+  timeout: 30
+  stage: ${self:custom.env.NODE_ENV}
+
+  environment: 
+    NODE_ENV: ${self:custom.env.NODE_ENV}
+    tableName: ${self:custom.tableName}
+    S3Bucket: ${self:custom.env.bucket}
+    SQS_QUEUE_URL: { Ref: ReportingSQSQueue }
+
+  iamRoleStatements:
+    - Effect: 'Allow'
+      Action: 
+        - 'ssm:GetParameters'
+      Resource: 
+        - 'arn:aws:ssm:#{AWS::Region}:#{AWS::AccountId}:parameter/reportingCron.*'
+    - Effect: 'Allow'
+      Action: 
+        - dynamodb:DescribeTable
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: 
+        - "Fn::GetAtt": [ReportingCron, Arn]
+    - Effect: 'Allow'
+      Action: 
+        - "s3:*"
+      Resource:
+        # Fn::Join:
+        #   - ''
+        #   - - 'arn:aws:s3:::${self:custom.env.bucket}'
+        #     - Ref: 'AWS::AccountId'
+        #     - '/*'
+        # - { "Fn::Join" : ["", ["arn:aws:s3:::${self:custom.env.bucket}/*"]] }
+        - 'arn:aws:s3:::${self:custom.env.bucket}'
+        - 'arn:aws:s3:::${self:custom.env.bucket}/*'
+        # - 'arn:aws:s3:::${self:custom.env.bucket}'
+    - Effect: Allow
+      Action:
+        - sqs:*
+      Resource:
+        Fn::GetAtt: [ ReportingSQSQueue, Arn ]
+
+functions:
+  healthCheck:
+    handler: handler.awsConfig
+    events:
+      - http:
+          path: health
+          method: get
+          cors: true
+  create:
+    # - path: url path is /crons
+    # - method: POST request
+    handler: dynamodb/create.main
+    events:
+      - http:
+          path: crons
+          method: post
+          cors: true
+  get:
+    # - path: url path is /crons/{id}
+    # - method: GET request
+    handler: dynamodb/get.main
+    events:
+      - http:
+          path: crons/{id}
+          method: get
+          cors: true
+  list:
+    # - path: url path is /crons
+    # - method: GET request
+    handler: dynamodb/list.main
+    events:
+      - http:
+          path: crons
+          method: get
+          cors: true
+  update:
+    # - path: url path is /crons/{id}
+    # - method: PUT request
+    handler: dynamodb/update.main
+    events:
+      - http:
+          path: crons/{id}
+          method: put
+          cors: true
+  delete:
+    # - path: url path is /crons/{id}
+    # - method: DELETE request
+    handler: dynamodb/delete.main
+    events:
+      - http:
+          path: crons/{id}
+          method: delete
+          cors: true
+  generate:
+    # - path: url path is /crons/{id}
+    # - method: get request
+    handler: cron/generate.main
+    package:
+      include:
+        - ./templates/emails/_default.html
+    events:
+      - http:
+          path: crons/{id}/generate
+          method: get
+          cors: true
+      - s3:
+          bucket: ${self:custom.env.bucket}
+          existing: true
+  cron:
+    handler: cron/worker.main
+    events:
+      # Invoke Lambda function every minute
+      - schedule: rate(1 minute)
+  sqsReceiver:
+    handler: sqs/receiver.main
+    package:
+      include:
+        - templates/**/*.html
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - ReportingSQSQueue
+              - Arn
+
+# Create our resources with separate CloudFormation templates
+resources:
+  # API Gateway Errors
+  - ${file(resources/api-gateway-errors.yml)}
+  # DynamoDB
+  - ${file(resources/dynamodb-table.yml)}
+  # S3
+  # - ${file(resources/s3-bucket.yml)}
+  # SQS
+  - ${file(resources/sqs-service.yml)}

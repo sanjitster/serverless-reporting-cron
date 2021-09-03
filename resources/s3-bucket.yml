@@ -1,0 +1,5 @@
+Resources:
+  S3SharedBucketArtifacts:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: ${self:custom.env.bucket}

@@ -21,12 +21,12 @@ export class NodeMailer {
 
     private Mailer: Mail;
     private config: INodeMailerConfig = {
-        host: "email-smtp.us-east-1.amazonaws.com",
-        port: 465,
+        host: "",
+        port: 266,
         secure: true,
         auth: {
-            user: "AKIAJU6ET6CXWPZN64YA",
-            pass: "Aj6+1XQJ9mmj2giYfbSadZf6cp3Kl5U010RWuzuw064t"
+            user: "",
+            pass: ""
         }
     };
     private _defaultBody = '_default';
